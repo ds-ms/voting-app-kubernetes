@@ -20,6 +20,7 @@ variables:
 
   # Agent VM image name
   vmImageName: 'ubuntu-latest'
+  k8sNamespaceForPR: '$(system.pullRequest.sourceBranch)'
 
 stages:
 - stage: Build
@@ -49,6 +50,7 @@ stages:
   jobs:
   - deployment: Deploy
     displayName: Deploy
+    condition: and(succeeded(), not(startsWith(variables['Build.SourceBranch'], 'refs/pull/')))
     pool:
       vmImage: $(vmImageName)
     environment: 'dsmsvotingappkubernetes.default'
@@ -74,3 +76,59 @@ stages:
                 $(imagePullSecret)
               containers: |
                 $(containerRegistry)/$(imageRepository):$(tag)
+
+  - deployment: DeployPR
+    displayName: Deploy PR
+    condition: and(succeeded(), startsWith(variables['Build.SourceBranch'], 'refs/pull/'))
+    pool:
+      vmImage: $(vmImageName)
+      
+    environment: 'dsmsvotingappkubernetes.default'
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+
+          - task: Kubernetes@1
+            displayName: 'kubectl create namespace'
+            inputs:
+              command: apply
+              useConfigurationFile: true
+              inline: '{ "kind": "Namespace", "apiVersion": "v1", "metadata": { "name": "$(k8sNamespaceForPR)", "labels": { "azds.io/parent-space" : "default", "azds.io/space": "true", "azds.io/pull-request-space": "true" } }}'
+
+          - task: KubernetesManifest@0
+            displayName: Create imagePullSecret
+            inputs:
+              action: createSecret
+              secretName: $(imagePullSecret)
+              namespace: $(k8sNamespaceForPR)
+              dockerRegistryEndpoint: $(dockerRegistryServiceConnection)
+          
+          - task: KubernetesManifest@0
+            displayName: Deploy to Kubernetes cluster
+            inputs:
+              action: deploy
+              namespace: $(k8sNamespaceForPR)
+              manifests: |
+                $(Pipeline.Workspace)/manifests/deployment.yml
+                $(Pipeline.Workspace)/manifests/service.yml
+              imagePullSecrets: |
+                $(imagePullSecret)
+              containers: |
+                $(containerRegistry)/$(imageRepository):$(tag)
+          
+          - task: Kubernetes@1
+            name: get
+            displayName: 'kubectl get services'
+            inputs:
+              command: get
+              namespace: $(k8sNamespaceForPR)
+              arguments: svc
+          
+          - powershell: |
+              $service=$(echo '$(get.KubectlOutput)' |  Out-String | ConvertFrom-Json).items[0]
+              $ip=$service.status.loadBalancer.ingress.ip
+              $port=$service.spec.ports.port
+              $message="Deployment to your review-app succeeded."
+              if($ip) {$message="${message}<br><br>You can navigate to http://${ip}:${port} to test your changes"}
+              echo "##vso[task.setvariable variable=GITHUB_COMMENT]${message}"
