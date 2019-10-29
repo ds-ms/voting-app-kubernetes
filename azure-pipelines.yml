@@ -53,7 +53,6 @@ stages:
     condition: and(succeeded(), not(startsWith(variables['Build.SourceBranch'], 'refs/pull/')))
     pool:
       vmImage: $(vmImageName)
-    environment: 'dsmsvotingappkubernetes'
     strategy:
       runOnce:
         deploy:
@@ -84,8 +83,6 @@ stages:
     condition: and(succeeded(), startsWith(variables['Build.SourceBranch'], 'refs/pull/'))
     pool:
       vmImage: $(vmImageName)
-      
-    environment: 'dsmsvotingappkubernetes'
     strategy:
       runOnce:
         deploy:
