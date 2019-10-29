@@ -14,7 +14,7 @@ variables:
   dockerRegistryServiceConnection: '53f69d67-807e-4861-9dc2-953f2b1422fe'
   imageRepository: 'dsmsvotingappkubernetes'
   containerRegistry: 'desattiracr.azurecr.io'
-  dockerfilePath: '**/Dockerfile'
+  dockerfilePath: 'vote/Dockerfile'
   tag: '$(Build.BuildId)'
   imagePullSecret: 'desattiracr2084e59e-auth'
 
