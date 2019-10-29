@@ -1,0 +1,16 @@
+apiVersion : apps/v1beta1
+kind: Deployment
+metadata:
+  name: dsmsvotingappkubernetes 
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: dsmsvotingappkubernetes 
+    spec:
+      containers:
+        - name: dsmsvotingappkubernetes 
+          image: desattiracr.azurecr.io/dsmsvotingappkubernetes
+          ports:
+          - containerPort: 80
